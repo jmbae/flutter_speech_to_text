@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 typedef void AvailabilityHandler(bool result);
 typedef void StringResultHandler(String text);
 
-
 class FlutterSpeechToText {
   static const MethodChannel _channel =
       const MethodChannel('flutter_speech_to_text');
@@ -16,9 +15,11 @@ class FlutterSpeechToText {
     return version;
   }
 
-  static final FlutterSpeechToText _speech = new FlutterSpeechToText._internal();
+  static final FlutterSpeechToText _speech = FlutterSpeechToText._internal();
 
   factory FlutterSpeechToText() => _speech;
+
+  static FlutterSpeechToText get shared => _speech;
 
   FlutterSpeechToText._internal() {
     _channel.setMethodCallHandler(_platformCallHandler);
@@ -36,10 +37,16 @@ class FlutterSpeechToText {
   VoidCallback errorHandler;
 
   /// ask for speech  recognizer permission
-  Future activate() => _channel.invokeMethod("speech.activate");
+  Future activate({String locale}) {
+    return _channel.invokeMethod("speech.activate", locale);
+  }
 
   /// configuration
-  Future config({String locale}) => _channel.invokeMethod("speech.config");
+  Future config({String locale}) {
+    print('config');
+    print(locale);
+    return _channel.invokeMethod("speech.config", locale);
+  }
 
   /// start listening
   Future listen({String locale}) =>
@@ -97,5 +104,4 @@ class FlutterSpeechToText {
       currentLocaleHandler = handler;
 
   void setErrorHandler(VoidCallback handler) => errorHandler = handler;
-
 }

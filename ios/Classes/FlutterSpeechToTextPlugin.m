@@ -7,7 +7,7 @@
 
 - (void)main
 {
-
+    
 }
 
 @end
@@ -27,23 +27,26 @@ API_AVAILABLE(ios(10.0))
 
 @implementation FlutterSpeechToTextPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-  FlutterMethodChannel* channel = [FlutterMethodChannel
-      methodChannelWithName:@"flutter_speech_to_text"
-            binaryMessenger:[registrar messenger]];
-  FlutterSpeechToTextPlugin* instance = [[FlutterSpeechToTextPlugin alloc] init];
-  [registrar addMethodCallDelegate:instance channel:channel];
+    FlutterMethodChannel* channel = [FlutterMethodChannel
+                                     methodChannelWithName:@"flutter_speech_to_text"
+                                     binaryMessenger:[registrar messenger]];
+    FlutterSpeechToTextPlugin* instance = [[FlutterSpeechToTextPlugin alloc] init];
+    [registrar addMethodCallDelegate:instance channel:channel];
+    instance.speechChannel = channel;
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     NSLog(@"HandleMethod: %@", call.method);
-
+    NSLog(@"arguments: %@", call.arguments);
+    
     if ([@"getPlatformVersion" isEqualToString:call.method]) {
         result([@"iOS " stringByAppendingString:[[UIDevice currentDevice] systemVersion]]);
     } else if ([@"speech.activate" isEqualToString:call.method]) {
-        [self activeRecognitionWithResult: result];
+        NSLocale* locale = [NSLocale localeWithLocaleIdentifier:[call arguments]];
+        [self activeRecognitionWithLocale:locale withResult: result];
     } else if ([@"speech.config" isEqualToString:call.method]) {
-        NSLog(@"speech.config: %@", [[call arguments] stringValue]);
-        NSLocale* locale = [NSLocale localeWithLocaleIdentifier:[[call arguments] stringValue]];
+        NSLog(@"speech.config: %@", [call arguments]);
+        NSLocale* locale = [NSLocale localeWithLocaleIdentifier:[call arguments]];
         [self configSpeechRecognitionWithLocale:locale withResult:result];
     } else if ([@"speech.listen" isEqualToString:call.method]) {
         [self startRecognitionWithResult:result];
@@ -61,8 +64,7 @@ API_AVAILABLE(ios(10.0))
         [self.speechChannel invokeMethod:@"speech.onSpeechAvailability" arguments:[NSNumber numberWithBool:available]];
 }
 
-- (void)activeRecognitionWithResult: (FlutterResult)result {
-    NSLocale* locale = [NSLocale localeWithLocaleIdentifier:@"en_US"];
+- (void)activeRecognitionWithLocale:(NSLocale*)locale withResult: (FlutterResult)result {
     NSLog(@"activeRecognitionWithResult: %@", [locale localeIdentifier]);
     _audioEngine = [[AVAudioEngine alloc] init];
     [self configSpeechRecognitionWithLocale:locale withResult:result];
@@ -71,12 +73,12 @@ API_AVAILABLE(ios(10.0))
 - (void)configSpeechRecognitionWithLocale:(NSLocale*)locale withResult:(FlutterResult) result {
     if (@available(iOS 10.0, *)) {
         NSLog(@"configSpeechRecognitionWithLocale: %@", [locale localeIdentifier]);
-
+        
         _speechRecognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
         _speechRecognizer.delegate = self;
-
+        
         [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
-
+            
             switch (status) {
                 case SFSpeechRecognizerAuthorizationStatusNotDetermined:
                     result(@NO);
@@ -99,7 +101,7 @@ API_AVAILABLE(ios(10.0))
     } else {
         // Fallback on earlier versions
     }
-
+    
 }
 
 - (void)startRecognitionWithResult:(FlutterResult)result {
@@ -140,7 +142,7 @@ API_AVAILABLE(ios(10.0))
             [_recognitionTask cancel];
             _recognitionTask = nil;
         }
-
+        
         NSError * outError;
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         @try {
@@ -152,7 +154,7 @@ API_AVAILABLE(ios(10.0))
         }
         _recognitionRequest = [[SFSpeechAudioBufferRecognitionRequest alloc] init];
         _inputNode = [_audioEngine inputNode];
-
+        
         if (_inputNode == nil) {
             NSLog(@"Audio engine has no input node");
         }
@@ -165,11 +167,9 @@ API_AVAILABLE(ios(10.0))
                                                                BOOL isFinal = NO;
                                                                if (result != nil) {
                                                                    NSLog(@"speech.onSpeech:%@", result.bestTranscription.formattedString);
-
                                                                    if (self.speechChannel != nil) {
                                                                        [self.speechChannel invokeMethod:@"speech.onSpeech" arguments:result.bestTranscription.formattedString];
                                                                    }
-                                                                   isFinal = result.isFinal;
                                                                }
                                                                if (error != nil || isFinal) {
                                                                    [self.audioEngine stop];
@@ -178,20 +178,20 @@ API_AVAILABLE(ios(10.0))
                                                                    self.recognitionTask = nil;
                                                                }
                                                            }];
-
+        
         AVAudioFormat *recordingFormat = [_inputNode outputFormatForBus:0];
         [_inputNode installTapOnBus:0 bufferSize:1024 format:recordingFormat block:^(AVAudioPCMBuffer *buffer, AVAudioTime *when) {
             [self.recognitionRequest appendAudioPCMBuffer:buffer];
         }];
-
+        
         [_audioEngine prepare];
-
+        
         @try {
             [_audioEngine startAndReturnError:&outError];
         } @catch (NSException *e) {
             NSLog(@"audioEngine couldn't start because of an error. %@", e);
         }
-
+        
         if (_speechChannel != nil) {
             [_speechChannel invokeMethod:@"speech.onRecognitionStarted" arguments:NULL];
         }

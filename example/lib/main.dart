@@ -34,28 +34,29 @@ class _MyAppState extends State<MyApp> {
 
   String transcription = '';
 
-  //String _currentLocale = 'en_US';
-  Language selectedLang = languages.first;
+  Language selectedLang;
 
   @override
   initState() {
     super.initState();
+    selectedLang = languages.first;
     activateSpeechRecognizer();
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
-  void activateSpeechRecognizer() {
+  void activateSpeechRecognizer() async {
     print('_MyAppState.activateSpeechRecognizer... ');
-    _speech = new FlutterSpeechToText();
+    _speech = FlutterSpeechToText.shared;
     _speech.setAvailabilityHandler(onSpeechAvailability);
     _speech.setCurrentLocaleHandler(onCurrentLocale);
     _speech.setRecognitionStartedHandler(onRecognitionStarted);
     _speech.setRecognitionResultHandler(onRecognitionResult);
     _speech.setRecognitionCompleteHandler(onRecognitionComplete);
     _speech.setErrorHandler(errorHandler);
-    _speech
-        .activate()
-        .then((res) => setState(() => _speechRecognitionAvailable = res));
+    var response = await _speech.activate(locale: selectedLang.code);
+    setState(() {
+      _speechRecognitionAvailable = response;
+    });
   }
 
   @override
@@ -82,7 +83,7 @@ class _MyAppState extends State<MyApp> {
                       child: new Container(
                           padding: const EdgeInsets.all(8.0),
                           color: Colors.grey.shade200,
-                          child: new Text(transcription))),
+                          child: Text(transcription, style: TextStyle(color: Colors.black)))),
                   _buildButton(
                     onPressed: _speechRecognitionAvailable && !_isListening
                         ? () => start()
@@ -108,14 +109,15 @@ class _MyAppState extends State<MyApp> {
 
   List<CheckedPopupMenuItem<Language>> get _buildLanguagesWidgets => languages
       .map((l) => new CheckedPopupMenuItem<Language>(
-    value: l,
-    checked: selectedLang == l,
-    child: new Text(l.name),
-  ))
+            value: l,
+            checked: selectedLang == l,
+            child: new Text(l.name),
+          ))
       .toList();
 
   void _selectLangHandler(Language lang) {
-      setState(() {
+    setState(() {
+      print(lang.code);
       _speech.config(locale: lang.code);
       selectedLang = lang;
     });
@@ -132,36 +134,63 @@ class _MyAppState extends State<MyApp> {
         ),
       ));
 
-  void start() => _speech
-      .listen(locale: selectedLang.code)
-      .then((result) => print('_MyAppState.start => result $result'));
+  void start() async {
+    var result = await _speech.listen(locale: selectedLang.code);
+    print('_MyAppState.start => result $result');
+    setState(() {
+      _isListening = result;
+    });
+  }
 
-  void cancel() =>
-      _speech.cancel().then((result) => setState(() => _isListening = result));
+  void cancel() async {
+    var result = await _speech.cancel();
+    setState(() {
+      _isListening = result;
+    });
+  }
 
-  void stop() => _speech.stop().then((result) {
-    setState(() => _isListening = result);
-  });
+  void stop() async {
+    var result = await _speech.stop();
+    setState(() {
+      _isListening = result;
+    });
+  }
 
-  void onSpeechAvailability(bool result) =>
-      setState(() => _speechRecognitionAvailable = result);
+  void onSpeechAvailability(bool result) {
+    setState(() {
+      return _speechRecognitionAvailable = result;
+    });
+  }
 
   void onCurrentLocale(String locale) {
     print('_MyAppState.onCurrentLocale... $locale');
 
-    setState((){
+    setState(() {
       selectedLang = languages.firstWhere((l) => l.code == locale);
     });
   }
 
-  void onRecognitionStarted() => setState(() => _isListening = true);
+  void onRecognitionStarted() {
+    print('onRecognitionStarted');
+    setState(() {
+      return _isListening = true;
+    });
+  }
 
-  void onRecognitionResult(String text) => setState(() => transcription = text);
+  void onRecognitionResult(String text) {
+    print('onRecognitionResult: $text');
+    setState(() {
+      return transcription = text;
+    });
+  }
 
-  void onRecognitionComplete(String text) => setState(() {
-    print(text);
-    _isListening = false;
-  });
+  void onRecognitionComplete(String text) {
+    print('onRecognitionComplete: $text');
+    setState(() {
+      print(text);
+      _isListening = false;
+    });
+  }
 
   void errorHandler() => activateSpeechRecognizer();
 }
