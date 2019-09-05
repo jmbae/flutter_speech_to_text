@@ -171,6 +171,8 @@ API_AVAILABLE(ios(10.0))
                                                                        [self.speechChannel invokeMethod:@"speech.onSpeech" arguments:result.bestTranscription.formattedString];
                                                                    }
                                                                }
+                                                               NSLog(@"isFinal: %d", result.isFinal);
+                                                               isFinal = result.isFinal;
                                                                if (error != nil || isFinal) {
                                                                    [self.audioEngine stop];
                                                                    [self.inputNode removeTapOnBus:0];
